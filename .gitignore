@@ -1,0 +1,34 @@
+# 資料庫
+database/*.db
+database/*.sqlite
+database/*.sqlite3
+
+# 上傳的檔案
+assets/uploads/*
+!assets/uploads/.gitkeep
+assets/thumbnails/*
+!assets/thumbnails/.gitkeep
+
+# IDE 和編輯器檔案
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 系統檔案
+.DS_Store
+Thumbs.db
+
+# PHP 相關
+vendor/
+composer.lock
+*.log
+
+# 環境設定
+.env
+.env.*
+!.env.example
+
+# 保留空目錄
+!.gitkeep
