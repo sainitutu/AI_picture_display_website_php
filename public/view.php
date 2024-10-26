@@ -55,7 +55,11 @@ if (!$image) {
             <div class="form-group">
                 <label>詳細資訊：</label>
                 <div class="details-container">
-                    <button class="copy-button" onclick="copyDetails()">複製</button>
+                    <?php if ($image['type'] === 'SD'): ?>
+                        <button class="action-button" onclick="copyDetails()">複製</button>
+                    <?php else: ?>
+                        <button class="action-button" onclick="downloadJSON()">下載 JSON</button>
+                    <?php endif; ?>
                     <div style="white-space: pre-wrap;"><?= htmlspecialchars($image['details']) ?></div>
                 </div>
             </div>
@@ -69,10 +73,11 @@ if (!$image) {
     </div>
 
     <script>
+        const details = <?= json_encode($image['details']) ?>;
+
         function copyDetails() {
-            const details = <?= json_encode($image['details']) ?>;
             navigator.clipboard.writeText(details).then(() => {
-                const button = document.querySelector('.copy-button');
+                const button = document.querySelector('.action-button');
                 button.textContent = '已複製';
                 button.classList.add('copied');
                 
@@ -84,6 +89,29 @@ if (!$image) {
                 console.error('複製失敗：', err);
                 alert('複製失敗');
             });
+        }
+
+        function downloadJSON() {
+            try {
+                // Parse the details as JSON to validate it
+                const jsonData = JSON.parse(details);
+                
+                // Create a Blob with the JSON data
+                const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                // Create a temporary link and trigger download
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'workflow.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                console.error('JSON 解析失敗：', err);
+                alert('無法下載 JSON：詳細資訊不是有效的 JSON 格式');
+            }
         }
     </script>
 </body>

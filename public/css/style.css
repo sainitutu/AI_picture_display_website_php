@@ -293,7 +293,7 @@ textarea {
     background-color: white;
 }
 
-.copy-button {
+.action-button {
     position: absolute;
     top: 8px;
     right: 8px;
@@ -308,11 +308,11 @@ textarea {
     transition: all 0.3s ease;
 }
 
-.copy-button:hover {
+.action-button:hover {
     opacity: 1;
 }
 
-.copy-button.copied {
+.action-button.copied {
     background-color: #2ecc71;
 }
 
