@@ -117,6 +117,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             const cancelKeywordBtn = document.getElementById('cancelKeywordBtn');
             const imageInput = document.getElementById('image');
             const imagePreview = document.getElementById('imagePreview');
+            const typeSelect = document.getElementById('type');
+            const detailsTextarea = document.getElementById('details');
             let keywords = new Set();
 
             function updateKeywordsInput() {
@@ -198,19 +200,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            // Image preview
-            imageInput.addEventListener('change', function() {
+            async function analyzeImage(file) {
+                const formData = new FormData();
+                formData.append('image', file);
+
+                try {
+                    console.log('Sending image for analysis:', file.name);
+                    const response = await fetch('/api/analyze.php', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const text = await response.text();
+                    console.log('Raw response:', text);
+
+                    if (!text.trim()) {
+                        console.error('Empty response received');
+                        return null;
+                    }
+
+                    try {
+                        const result = JSON.parse(text);
+                        console.log('Parsed result:', result);
+
+                        if (result.error) {
+                            console.error('Analysis error:', result.error);
+                            return null;
+                        }
+
+                        if (!result.found) {
+                            console.log('No image info found');
+                            return null;
+                        }
+
+                        return result.data;
+                    } catch (parseError) {
+                        console.error('JSON parse error:', parseError);
+                        console.error('Raw response:', text);
+                        return null;
+                    }
+                } catch (error) {
+                    console.error('Image analysis failed:', error);
+                    return null;
+                }
+            }
+
+            // Image preview and analysis
+            imageInput.addEventListener('change', async function() {
                 const file = this.files[0];
                 if (file) {
+                    // Show preview
                     const reader = new FileReader();
                     reader.onload = function(e) {
                         imagePreview.innerHTML = `<img src="${e.target.result}" class="image-preview">`;
                     };
                     reader.readAsDataURL(file);
+
+                    try {
+                        // Analyze image
+                        const metadata = await analyzeImage(file);
+                        console.log('Analysis result:', metadata);
+                        if (metadata) {
+                            if (metadata.parameters) {
+                                typeSelect.value = 'SD';
+                                detailsTextarea.value = metadata.parameters;
+                            } else if (metadata.workflow) {
+                                typeSelect.value = 'Comfy';
+                                detailsTextarea.value = metadata.workflow;
+                            }
+                        }
+                    } catch (error) {
+                        console.error('處理圖片時發生錯誤：', error);
+                    }
                 }
             });
 
-            // Event Listeners
             keywordInput.addEventListener('input', (e) => {
                 updateSearchSuggestions(e.target.value.trim());
             });
