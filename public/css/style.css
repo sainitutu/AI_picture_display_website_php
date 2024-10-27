@@ -218,6 +218,11 @@ textarea {
 textarea {
     min-height: 300px;
     resize: vertical;
+    font-family: inherit;
+}
+
+#promptInput {
+    min-height: 150px;
 }
 
 .button-group {
@@ -324,4 +329,11 @@ textarea {
     background-color: var(--secondary-color);
     padding: 20px;
     border-radius: 4px;
+}
+
+/* Keyword analysis button */
+.keyword-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
 }

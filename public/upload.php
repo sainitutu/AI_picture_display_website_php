@@ -76,7 +76,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="search-suggestions"></div>
                 </div>
                 <input type="hidden" name="keywords" id="keywordsInput" value="">
-                <button type="button" id="addKeywordBtn" class="button">新增關鍵詞</button>
+                <div class="keyword-buttons">
+                    <button type="button" id="addKeywordBtn" class="button">新增關鍵詞</button>
+                    <button type="button" id="analyzeKeywordsBtn" class="button">分析關鍵詞</button>
+                </div>
             </div>
 
             <div class="form-group">
@@ -104,6 +107,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </div>
 
+    <div id="analyzePromptModal" class="modal">
+        <div class="modal-content">
+            <h2>分析關鍵詞</h2>
+            <div class="form-group">
+                <label for="promptInput">請輸入提詞(正向提詞)</label>
+                <textarea id="promptInput"></textarea>
+            </div>
+            <div class="button-group">
+                <button id="cancelAnalyzeBtn" class="button">取消</button>
+                <button id="analyzePromptBtn" class="button">分析</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const keywordInput = document.getElementById('keywordInput');
@@ -111,10 +128,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             const keywordsInput = document.getElementById('keywordsInput');
             const searchSuggestions = document.querySelector('.search-suggestions');
             const addKeywordBtn = document.getElementById('addKeywordBtn');
+            const analyzeKeywordsBtn = document.getElementById('analyzeKeywordsBtn');
             const keywordModal = document.getElementById('keywordModal');
+            const analyzePromptModal = document.getElementById('analyzePromptModal');
             const newKeywordInput = document.getElementById('newKeywordInput');
+            const promptInput = document.getElementById('promptInput');
             const saveKeywordBtn = document.getElementById('saveKeywordBtn');
             const cancelKeywordBtn = document.getElementById('cancelKeywordBtn');
+            const analyzePromptBtn = document.getElementById('analyzePromptBtn');
+            const cancelAnalyzeBtn = document.getElementById('cancelAnalyzeBtn');
             const imageInput = document.getElementById('image');
             const imagePreview = document.getElementById('imagePreview');
             const typeSelect = document.getElementById('type');
@@ -200,6 +222,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
+            async function analyzePrompt(prompt) {
+                try {
+                    const response = await fetch('/api/analyze_keywords.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ prompt }),
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('分析失敗');
+                    }
+
+                    const data = await response.json();
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+
+                    return data.keywords;
+                } catch (error) {
+                    console.error('分析關鍵詞時發生錯誤：', error);
+                    alert('分析關鍵詞失敗：' + error.message);
+                    return null;
+                }
+            }
+
             async function analyzeImage(file) {
                 const formData = new FormData();
                 formData.append('image', file);
@@ -279,6 +328,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             });
 
+            // Event Listeners
             keywordInput.addEventListener('input', (e) => {
                 updateSearchSuggestions(e.target.value.trim());
             });
@@ -305,15 +355,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 keywordModal.style.display = 'flex';
             });
 
+            analyzeKeywordsBtn.addEventListener('click', () => {
+                promptInput.value = '';
+                analyzePromptModal.style.display = 'flex';
+            });
+
             cancelKeywordBtn.addEventListener('click', () => {
                 keywordModal.style.display = 'none';
                 newKeywordInput.value = '';
+            });
+
+            cancelAnalyzeBtn.addEventListener('click', () => {
+                analyzePromptModal.style.display = 'none';
+                promptInput.value = '';
             });
 
             saveKeywordBtn.addEventListener('click', () => {
                 const keyword = newKeywordInput.value.trim();
                 if (keyword) {
                     addNewKeyword(keyword);
+                }
+            });
+
+            analyzePromptBtn.addEventListener('click', async () => {
+                const prompt = promptInput.value.trim();
+                if (!prompt) {
+                    alert('請輸入提詞');
+                    return;
+                }
+
+                const matchedKeywords = await analyzePrompt(prompt);
+                if (matchedKeywords && matchedKeywords.length > 0) {
+                    matchedKeywords.forEach(keyword => addKeyword(keyword));
+                    analyzePromptModal.style.display = 'none';
+                    promptInput.value = '';
+                } else {
+                    alert('未找到匹配的關鍵詞');
                 }
             });
 
@@ -324,11 +401,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             });
 
-            // Close modal when clicking outside
-            keywordModal.addEventListener('click', (e) => {
+            // Close modals when clicking outside
+            window.addEventListener('click', (e) => {
                 if (e.target === keywordModal) {
                     keywordModal.style.display = 'none';
                     newKeywordInput.value = '';
+                }
+                if (e.target === analyzePromptModal) {
+                    analyzePromptModal.style.display = 'none';
+                    promptInput.value = '';
                 }
             });
         });
