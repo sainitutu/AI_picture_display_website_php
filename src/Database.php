@@ -95,9 +95,10 @@ class Database {
         return $result;
     }
 
-    public function searchImages($keywords = [], $searchType = 'AND', $includeHidden = false) {
+    public function searchImages($keywords = [], $searchType = 'AND', $includeHidden = false, $imageType = null) {
         $query = 'SELECT DISTINCT i.* FROM images i';
         $params = [];
+        $conditions = [];
         
         if (!empty($keywords)) {
             $query .= ' JOIN image_keywords ik ON i.id = ik.image_id
@@ -105,7 +106,7 @@ class Database {
             
             if ($searchType === 'AND') {
                 $placeholders = str_repeat('?,', count($keywords) - 1) . '?';
-                $query .= " WHERE i.id IN (
+                $conditions[] = "i.id IN (
                     SELECT ik2.image_id 
                     FROM image_keywords ik2 
                     JOIN keywords k2 ON ik2.keyword_id = k2.id 
@@ -116,13 +117,22 @@ class Database {
                 $params = array_merge($keywords, [count($keywords)]);
             } else {
                 $placeholders = str_repeat('?,', count($keywords) - 1) . '?';
-                $query .= " WHERE k.keyword IN ($placeholders)";
+                $conditions[] = "k.keyword IN ($placeholders)";
                 $params = $keywords;
             }
         }
 
         if (!$includeHidden) {
-            $query .= (empty($keywords) ? ' WHERE' : ' AND') . ' i.is_hidden = 0';
+            $conditions[] = 'i.is_hidden = 0';
+        }
+
+        if ($imageType) {
+            $conditions[] = 'i.type = ?';
+            $params[] = $imageType;
+        }
+
+        if (!empty($conditions)) {
+            $query .= ' WHERE ' . implode(' AND ', $conditions);
         }
 
         $query .= ' ORDER BY i.created_at DESC';

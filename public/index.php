@@ -5,8 +5,9 @@ require_once __DIR__ . '/../src/Database.php';
 $db = new Database();
 $keywords = isset($_GET['keywords']) && !empty($_GET['keywords']) ? explode(',', $_GET['keywords']) : [];
 $includeHidden = isset($_GET['includeHidden']) && $_GET['includeHidden'] === 'true';
+$imageType = isset($_GET['type']) ? $_GET['type'] : null;
 
-$images = $db->searchImages($keywords, 'OR', $includeHidden);
+$images = $db->searchImages($keywords, 'OR', $includeHidden, $imageType);
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -33,13 +34,22 @@ $images = $db->searchImages($keywords, 'OR', $includeHidden);
             </div>
             
             <div class="search-options">
-                <label>
-                    <input type="checkbox" name="includeHidden" <?= $includeHidden ? 'checked' : '' ?>>
-                    顯示隱藏圖片
-                </label>
+                <div class="search-options-right">
+                    <label class="hidden-option">
+                        <input type="checkbox" name="includeHidden" <?= $includeHidden ? 'checked' : '' ?>>
+                        顯示隱藏圖片
+                    </label>
+                    <div class="type-filter">
+                        <label>類型：</label>
+                        <select name="type" id="typeFilter">
+                            <option value="">全部</option>
+                            <option value="SD" <?= $imageType === 'SD' ? 'selected' : '' ?>>SD</option>
+                            <option value="Comfy" <?= $imageType === 'Comfy' ? 'selected' : '' ?>>Comfy</option>
+                        </select>
+                    </div>
+                    <button id="searchButton" class="button">搜尋</button>
+                </div>
             </div>
-
-            <button id="searchButton" class="button">搜尋</button>
         </div>
 
         <div class="gallery">
@@ -50,6 +60,7 @@ $images = $db->searchImages($keywords, 'OR', $includeHidden);
                     <div class="gallery-item <?= $image['is_hidden'] ? 'hidden-image' : '' ?>">
                         <a href="/view.php?id=<?= $image['id'] ?>">
                             <img src="/thumbnail.php?id=<?= $image['id'] ?>" alt="AI 生成圖片">
+                            <span class="image-type <?= strtolower($image['type']) ?>"><?= $image['type'] ?></span>
                         </a>
                     </div>
                 <?php endforeach; ?>
@@ -123,11 +134,16 @@ $images = $db->searchImages($keywords, 'OR', $includeHidden);
 
             function performSearch() {
                 const includeHidden = document.querySelector('input[name="includeHidden"]').checked;
+                const selectedType = document.getElementById('typeFilter').value;
                 
                 const params = new URLSearchParams({
                     keywords: Array.from(keywords).join(','),
                     includeHidden: includeHidden
                 });
+
+                if (selectedType) {
+                    params.append('type', selectedType);
+                }
 
                 window.location.href = `/?${params.toString()}`;
             }
