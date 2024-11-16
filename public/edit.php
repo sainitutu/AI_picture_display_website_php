@@ -44,14 +44,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-    <div class="container">
-        <form method="post">
+    <div class="fixed-header">
+        <form method="post" style="margin: 0;">
             <div class="button-group">
                 <a href="/view.php?id=<?= $id ?>" class="button">取消</a>
                 <button type="submit" name="delete" class="button danger" onclick="return confirm('確定要刪除這張圖片嗎？')">刪除</button>
                 <button type="submit" name="save" class="button">儲存</button>
             </div>
+        </form>
+    </div>
 
+    <div class="container">
+        <form method="post">
             <div class="image-container">
                 <img src="/image.php?id=<?= $id ?>" alt="AI 生成圖片" class="image-preview">
             </div>

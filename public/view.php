@@ -25,12 +25,14 @@ if (!$image) {
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-    <div class="container">
+    <div class="fixed-header">
         <div class="button-group">
             <a href="/" class="button">返回</a>
             <a href="/edit.php?id=<?= $id ?>" class="button">編輯</a>
         </div>
+    </div>
 
+    <div class="container">
         <div class="image-container">
             <img src="/image.php?id=<?= $id ?>" alt="AI 生成圖片" class="image-preview">
         </div>

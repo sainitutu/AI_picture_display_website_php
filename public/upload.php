@@ -41,13 +41,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-    <div class="container">
-        <form method="post" enctype="multipart/form-data">
+    <div class="fixed-header">
+        <form method="post" style="margin: 0;">
             <div class="button-group">
                 <a href="/" class="button">取消</a>
                 <button type="submit" name="save" class="button">儲存</button>
             </div>
+        </form>
+    </div>
 
+    <div class="container">
+        <form method="post" enctype="multipart/form-data">
             <?php if (isset($error)): ?>
                 <div class="error-message"><?= htmlspecialchars($error) ?></div>
             <?php endif; ?>
