@@ -2,10 +2,17 @@
 define('DB_PATH', __DIR__ . '/../database/aishow.db');
 define('UPLOAD_PATH', __DIR__ . '/../assets/uploads/');
 define('THUMBNAIL_PATH', __DIR__ . '/../assets/thumbnails/');
+define('ATTACHMENT_PATH', __DIR__ . '/../assets/');
 
-// Ensure error reporting is enabled during development
+// Set up error logging
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/../logs/php_error.log');
+
+// Create logs directory if it doesn't exist
+if (!file_exists(__DIR__ . '/../logs')) {
+    mkdir(__DIR__ . '/../logs', 0777, true);
+}
 
 // Initialize database connection
 function getDB() {
@@ -26,7 +33,9 @@ function getDB() {
 $directories = [
     dirname(DB_PATH),
     UPLOAD_PATH,
-    THUMBNAIL_PATH
+    THUMBNAIL_PATH,
+    ATTACHMENT_PATH . 'attachments',
+    __DIR__ . '/../logs'
 ];
 
 foreach ($directories as $dir) {

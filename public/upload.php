@@ -42,16 +42,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
     <div class="fixed-header">
-        <form method="post" style="margin: 0;">
-            <div class="button-group">
-                <a href="/" class="button">取消</a>
-                <button type="submit" name="save" class="button">儲存</button>
-            </div>
-        </form>
+        <div class="button-group">
+            <a href="/" class="button">取消</a>
+            <button type="button" class="button" onclick="document.getElementById('mainForm').submit();">儲存</button>
+        </div>
     </div>
 
     <div class="container">
-        <form method="post" enctype="multipart/form-data">
+        <form id="mainForm" method="post" enctype="multipart/form-data">
             <?php if (isset($error)): ?>
                 <div class="error-message"><?= htmlspecialchars($error) ?></div>
             <?php endif; ?>
@@ -97,6 +95,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     R18 內容
                 </label>
             </div>
+
+            <input type="hidden" name="save" value="1">
         </form>
     </div>
 

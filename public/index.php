@@ -4,10 +4,22 @@ require_once __DIR__ . '/../src/Database.php';
 
 $db = new Database();
 $keywords = isset($_GET['keywords']) && !empty($_GET['keywords']) ? explode(',', $_GET['keywords']) : [];
-$includeHidden = isset($_GET['includeHidden']) && $_GET['includeHidden'] === 'true';
+$imageVisibility = isset($_GET['visibility']) ? $_GET['visibility'] : 'hide_restricted';
 $imageType = isset($_GET['type']) ? $_GET['type'] : null;
 
-$images = $db->searchImages($keywords, 'OR', $includeHidden, $imageType);
+// Convert visibility option to includeHidden parameter
+$includeHidden = $imageVisibility === 'show_restricted';
+// For 'only_restricted', we'll modify the query in Database class
+$onlyRestricted = $imageVisibility === 'only_restricted';
+
+$images = $db->searchImages($keywords, 'OR', $includeHidden || $onlyRestricted, $imageType);
+
+// Filter for only restricted images if that option is selected
+if ($onlyRestricted) {
+    $images = array_filter($images, function($image) {
+        return $image['is_hidden'] == 1;
+    });
+}
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -16,13 +28,53 @@ $images = $db->searchImages($keywords, 'OR', $includeHidden, $imageType);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI 圖片庫</title>
     <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .cleanup-result {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            display: none;
+            z-index: 2000;
+            max-width: 300px;
+            word-break: break-word;
+        }
+
+        .cleanup-result.success {
+            background-color: #2ecc71;
+            color: white;
+        }
+
+        .cleanup-result.error {
+            background-color: #e74c3c;
+            color: white;
+        }
+
+        .loading {
+            display: none;
+            margin-left: 10px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>AI 圖片庫</h1>
-            <a href="/upload.php" class="button">新增圖片</a>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button id="cleanupBtn" class="button">整理資料</button>
+                <span id="cleanupLoading" class="loading">⟳</span>
+                <a href="/upload.php" class="button">新增圖片</a>
+            </div>
         </header>
+
+        <div id="cleanupResult" class="cleanup-result"></div>
 
         <div class="search-section">
             <div class="search-container">
@@ -35,10 +87,14 @@ $images = $db->searchImages($keywords, 'OR', $includeHidden, $imageType);
             
             <div class="search-options">
                 <div class="search-options-right">
-                    <label class="hidden-option">
-                        <input type="checkbox" name="includeHidden" <?= $includeHidden ? 'checked' : '' ?>>
-                        顯示隱藏圖片
-                    </label>
+                    <div class="visibility-filter">
+                        <label>限制圖片：</label>
+                        <select name="visibility" id="visibilityFilter">
+                            <option value="hide_restricted" <?= $imageVisibility === 'hide_restricted' ? 'selected' : '' ?>>隱藏限制圖片</option>
+                            <option value="show_restricted" <?= $imageVisibility === 'show_restricted' ? 'selected' : '' ?>>顯示限制圖片</option>
+                            <option value="only_restricted" <?= $imageVisibility === 'only_restricted' ? 'selected' : '' ?>>只顯示限制圖片</option>
+                        </select>
+                    </div>
                     <div class="type-filter">
                         <label>類型：</label>
                         <select name="type" id="typeFilter">
@@ -74,6 +130,9 @@ $images = $db->searchImages($keywords, 'OR', $includeHidden, $imageType);
             const keywordChips = document.querySelector('.keyword-chips');
             const searchSuggestions = document.querySelector('.search-suggestions');
             const searchButton = document.getElementById('searchButton');
+            const cleanupBtn = document.getElementById('cleanupBtn');
+            const cleanupLoading = document.getElementById('cleanupLoading');
+            const cleanupResult = document.getElementById('cleanupResult');
             let keywords = new Set();
 
             // Load initial keywords from URL if any
@@ -82,6 +141,41 @@ $images = $db->searchImages($keywords, 'OR', $includeHidden, $imageType);
             if (initialKeywords) {
                 initialKeywords.split(',').forEach(keyword => addKeyword(keyword.trim()));
             }
+
+            function showCleanupResult(message, isSuccess) {
+                cleanupResult.textContent = message;
+                cleanupResult.className = 'cleanup-result ' + (isSuccess ? 'success' : 'error');
+                cleanupResult.style.display = 'block';
+                
+                setTimeout(() => {
+                    cleanupResult.style.display = 'none';
+                }, 5000);
+            }
+
+            cleanupBtn.addEventListener('click', async () => {
+                if (!confirm('確定要整理資料嗎？這將刪除未使用的圖片檔案。')) {
+                    return;
+                }
+
+                cleanupBtn.disabled = true;
+                cleanupLoading.style.display = 'inline-block';
+
+                try {
+                    const response = await fetch('/api/cleanup.php');
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showCleanupResult(data.message, true);
+                    } else {
+                        showCleanupResult(data.error || '整理資料失敗', false);
+                    }
+                } catch (error) {
+                    showCleanupResult('整理資料時發生錯誤', false);
+                } finally {
+                    cleanupBtn.disabled = false;
+                    cleanupLoading.style.display = 'none';
+                }
+            });
 
             function addKeyword(keyword) {
                 if (keyword && !keywords.has(keyword)) {
@@ -133,12 +227,12 @@ $images = $db->searchImages($keywords, 'OR', $includeHidden, $imageType);
             }
 
             function performSearch() {
-                const includeHidden = document.querySelector('input[name="includeHidden"]').checked;
+                const visibility = document.getElementById('visibilityFilter').value;
                 const selectedType = document.getElementById('typeFilter').value;
                 
                 const params = new URLSearchParams({
                     keywords: Array.from(keywords).join(','),
-                    includeHidden: includeHidden
+                    visibility: visibility
                 });
 
                 if (selectedType) {

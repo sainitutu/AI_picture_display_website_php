@@ -24,7 +24,17 @@ CREATE TABLE IF NOT EXISTS image_keywords (
     PRIMARY KEY (image_id, keyword_id)
 );
 
+-- Create attachments table
+CREATE TABLE IF NOT EXISTS attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    image_id INTEGER NOT NULL,
+    file_path TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE
+);
+
 -- Create indexes
 CREATE INDEX IF NOT EXISTS idx_images_type ON images(type);
 CREATE INDEX IF NOT EXISTS idx_images_is_hidden ON images(is_hidden);
 CREATE INDEX IF NOT EXISTS idx_keywords_keyword ON keywords(keyword);
+CREATE INDEX IF NOT EXISTS idx_attachments_image_id ON attachments(image_id);

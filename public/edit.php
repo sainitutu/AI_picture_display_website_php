@@ -2,9 +2,21 @@
 require_once __DIR__ . '/../src/config.php';
 require_once __DIR__ . '/../src/Database.php';
 
+// Increase upload limits
+ini_set('upload_max_filesize', '64M');
+ini_set('post_max_size', '64M');
+ini_set('memory_limit', '512M');
+ini_set('max_file_uploads', '20'); // Allow up to 20 files to be uploaded simultaneously
+error_log("Upload limits: " . 
+    "upload_max_filesize=" . ini_get('upload_max_filesize') . "/" .
+    "post_max_size=" . ini_get('post_max_size') . "/" .
+    "memory_limit=" . ini_get('memory_limit') . "/" .
+    "max_file_uploads=" . ini_get('max_file_uploads')
+);
+
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if (!$id) {
-    header('Location: /');
+    header('Location: ./');
     exit;
 }
 
@@ -12,7 +24,7 @@ $db = new Database();
 $image = $db->getImage($id);
 
 if (!$image) {
-    header('Location: /');
+        header('Location: ./');
     exit;
 }
 
@@ -23,14 +35,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if (isset($_POST['delete_attachment'])) {
+        $attachmentId = (int)$_POST['attachment_id'];
+        $db->deleteAttachment($attachmentId);
+        header('Location: edit.php?id=' . $id);
+        exit;
+    }
+
     if (isset($_POST['save'])) {
         $type = $_POST['type'];
         $details = $_POST['details'];
         $isHidden = isset($_POST['is_hidden']);
         $keywords = isset($_POST['keywords']) ? explode(',', $_POST['keywords']) : [];
 
+        // Handle attachment uploads
+        if (isset($_FILES['attachments']) && is_array($_FILES['attachments']['name'])) {
+            $uploadDir = __DIR__ . '/../assets/attachments/';
+            if (!file_exists($uploadDir)) {
+                mkdir($uploadDir, 0777, true);
+            }
+
+            error_log("Upload: Received files: " . print_r($_FILES['attachments'], true));
+
+            foreach ($_FILES['attachments']['name'] as $i => $name) {
+                if ($_FILES['attachments']['error'][$i] === UPLOAD_ERR_OK && $_FILES['attachments']['size'][$i] > 0) {
+                    $fileExtension = pathinfo($name, PATHINFO_EXTENSION);
+                    $newFileName = uniqid() . '.' . $fileExtension;
+                    $uploadPath = $uploadDir . $newFileName;
+
+                    error_log("Upload: Processing file {$i}: {$name}");
+                    error_log("Upload: File info: " . print_r([
+                        'name' => $name,
+                        'type' => $_FILES['attachments']['type'][$i],
+                        'size' => $_FILES['attachments']['size'][$i],
+                        'tmp_name' => $_FILES['attachments']['tmp_name'][$i]
+                    ], true));
+
+                    if (move_uploaded_file($_FILES['attachments']['tmp_name'][$i], $uploadPath)) {
+                        error_log("Upload: File saved to: " . $uploadPath);
+                        error_log("Upload: File size: " . filesize($uploadPath));
+                        
+                        // Store relative path in database
+                        $relativePath = 'attachments/' . $newFileName;
+                        error_log("Upload: Storing path in DB: " . $relativePath);
+                        $db->addAttachment($id, $relativePath);
+                    } else {
+                        error_log("Upload: Failed to move uploaded file {$name}");
+                    }
+                } else if ($_FILES['attachments']['error'][$i] !== UPLOAD_ERR_NO_FILE) {
+                    error_log("Upload: Error for file {$i}: " . $_FILES['attachments']['error'][$i]);
+                }
+            }
+        } else {
+            error_log("Upload: No files received or invalid format");
+            error_log("Upload: FILES array: " . print_r($_FILES, true));
+        }
+
         $db->updateImage($id, $type, $details, $isHidden, $keywords);
-        header('Location: /view.php?id=' . $id);
+        header('Location: view.php?id=' . $id);
         exit;
     }
 }
@@ -41,23 +103,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>編輯圖片 - AI 圖片庫</title>
-    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <div class="fixed-header">
-        <form method="post" style="margin: 0;">
-            <div class="button-group">
-                <a href="/view.php?id=<?= $id ?>" class="button">取消</a>
-                <button type="submit" name="delete" class="button danger" onclick="return confirm('確定要刪除這張圖片嗎？')">刪除</button>
-                <button type="submit" name="save" class="button">儲存</button>
-            </div>
-        </form>
+        <div class="button-group">
+            <a href="view.php?id=<?= $id ?>" class="button">取消</a>
+            <button type="button" class="button danger" onclick="if(confirm('確定要刪除這張圖片嗎？')) document.getElementById('deleteForm').submit();">刪除</button>
+            <button type="button" class="button" onclick="submitForm()">儲存</button>
+        </div>
     </div>
 
     <div class="container">
-        <form method="post">
+        <form id="deleteForm" method="post" style="display: none;">
+            <input type="hidden" name="delete" value="1">
+        </form>
+
+        <form id="mainForm" method="post" enctype="multipart/form-data">
             <div class="image-container">
-                <img src="/image.php?id=<?= $id ?>" alt="AI 生成圖片" class="image-preview">
+                <img src="image.php?id=<?= $id ?>" alt="AI 生成圖片" class="image-preview">
             </div>
 
             <div class="form-group">
@@ -87,11 +151,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
 
             <div class="form-group">
+                <label>副件：</label>
+                <?php if (!empty($image['attachments'])): ?>
+                    <div class="current-attachments">
+                        <div class="attachment-list">
+                            <?php foreach ($image['attachments'] as $attachment): ?>
+                                <div class="attachment-item">
+                                    <span class="attachment-name"><?= basename($attachment['file_path']) ?></span>
+                                    <form method="post" style="display: inline;">
+                                        <input type="hidden" name="attachment_id" value="<?= $attachment['id'] ?>">
+                                        <button type="submit" name="delete_attachment" class="button danger small" onclick="return confirm('確定要刪除這個副件嗎？')">刪除</button>
+                                    </form>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+                <input type="file" name="attachments[]" multiple accept=".json,.txt,.png,.jpg,.jpeg,.webp">
+                <div class="help-text">支援的檔案類型：JSON、TXT、PNG、JPG、WEBP（可同時選擇多個檔案）</div>
+            </div>
+
+            <script>
+                document.querySelector('input[type="file"]').addEventListener('change', function(e) {
+                    const files = e.target.files;
+                    if (files.length > 0) {
+                        const fileList = Array.from(files).map(f => f.name).join(', ');
+                        const helpText = this.nextElementSibling;
+                        helpText.innerHTML = `已選擇 ${files.length} 個檔案：${fileList}<br>支援的檔案類型：JSON、TXT、PNG、JPG、WEBP（可同時選擇多個檔案）`;
+                    }
+                });
+            </script>
+
+            <style>
+                .attachment-list {
+                    margin: 10px 0;
+                }
+                .attachment-item {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 5px;
+                    margin: 5px 0;
+                    background: #f5f5f5;
+                    border-radius: 4px;
+                }
+                .attachment-name {
+                    margin-right: 10px;
+                }
+                .button.small {
+                    padding: 2px 8px;
+                    font-size: 0.9em;
+                }
+            </style>
+
+            <div class="form-group">
                 <label>
                     <input type="checkbox" name="is_hidden" <?= $image['is_hidden'] ? 'checked' : '' ?>>
                     R18 內容
                 </label>
             </div>
+
+            <input type="hidden" name="save" value="1">
         </form>
     </div>
 
@@ -107,6 +227,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <script>
+        function submitForm() {
+            const form = document.getElementById('mainForm');
+            const fileInput = form.querySelector('input[type="file"]');
+            const files = fileInput.files;
+            
+            // If files are selected, ensure they are properly attached
+            if (files.length > 0) {
+                const formData = new FormData(form);
+                // Verify files are in FormData
+                const attachments = formData.getAll('attachments[]');
+                if (attachments.length === 0) {
+                    alert('檔案上傳準備中，請稍候再試');
+                    return;
+                }
+            }
+            
+            form.submit();
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             const keywordInput = document.getElementById('keywordInput');
             const keywordChips = document.querySelector('.keyword-chips');
@@ -157,7 +296,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 try {
-                    const response = await fetch(`/api/suggest.php?q=${encodeURIComponent(partial)}`);
+                    const response = await fetch(`api/suggest.php?q=${encodeURIComponent(partial)}`);
                     const suggestions = await response.json();
                     
                     if (suggestions.length > 0) {
@@ -176,7 +315,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             async function addNewKeyword(keyword) {
                 try {
-                    const response = await fetch('/api/keyword.php', {
+                    const response = await fetch('api/keyword.php', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',

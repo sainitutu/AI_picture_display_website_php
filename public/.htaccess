@@ -1,0 +1,20 @@
+php_value upload_max_filesize 64M
+php_value post_max_size 64M
+php_value memory_limit 512M
+php_value max_execution_time 300
+php_value max_input_time 300
+
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+    
+    # Prevent access to .htaccess
+    RewriteRule ^\.htaccess$ - [F]
+    
+    # Allow access to assets directory
+    RewriteRule ^assets/ - [L]
+</IfModule>
